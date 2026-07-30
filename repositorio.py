@@ -159,6 +159,7 @@ def agregar_medida(medida: str) -> int:
         cur = cn.cursor()
         cur.execute(
             """
+            SET NOCOUNT ON;
             INSERT INTO dbo.MedidasLlanta (Medida, Ancho, Perfil, Rin)
             VALUES (?, ?, ?, ?);
             SELECT SCOPE_IDENTITY();
@@ -341,7 +342,8 @@ def obtener_orden(orden_id: int) -> dict:
 # ==================================================================
 # INVENTARIO
 # ==================================================================
-def listar_piezas(tipo: str = None, filtro: str = "", solo_activas: bool = True) -> list:
+def listar_piezas(tipo: str = None, filtro: str = "", solo_activas: bool = True,
+                   categoria: str = None) -> list:
     sql = "SELECT * FROM dbo.vw_Inventario WHERE 1 = 1"
     params = []
     if solo_activas:
@@ -349,6 +351,9 @@ def listar_piezas(tipo: str = None, filtro: str = "", solo_activas: bool = True)
     if tipo:
         sql += " AND Tipo = ?"
         params.append(tipo)
+    if categoria:
+        sql += " AND Categoria = ?"
+        params.append(categoria)
     if filtro:
         sql += """ AND (Medida LIKE ? OR ISNULL(Marca, '') LIKE ?
                         OR ISNULL(Modelo, '') LIKE ? OR ISNULL(Codigo, '') LIKE ?)"""
@@ -378,7 +383,7 @@ def guardar_pieza(datos: dict) -> int:
         cur.execute(
             """
             DECLARE @PiezaID INT;
-            EXEC dbo.sp_Pieza_Guardar ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @PiezaID OUTPUT;
+            EXEC dbo.sp_Pieza_Guardar ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @PiezaID OUTPUT;
             SELECT @PiezaID;
             """,
             (
@@ -394,6 +399,7 @@ def guardar_pieza(datos: dict) -> int:
                 float(datos.get("precio_venta") or 0),
                 datos.get("ubicacion"),
                 datos.get("usuario_id"),
+                datos.get("categoria") or "AUTO",
             ),
         )
         return int(cur.fetchone()[0])
@@ -401,7 +407,7 @@ def guardar_pieza(datos: dict) -> int:
 
 def actualizar_pieza(pieza_id: int, datos: dict) -> None:
     ejecutar(
-        "{CALL dbo.sp_Pieza_Actualizar (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}",
+        "{CALL dbo.sp_Pieza_Actualizar (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}",
         (
             pieza_id,
             datos["tipo"],
@@ -416,6 +422,7 @@ def actualizar_pieza(pieza_id: int, datos: dict) -> None:
             float(datos.get("precio_venta") or 0),
             datos.get("ubicacion"),
             datos.get("usuario_id"),
+            datos.get("categoria") or "AUTO",
         ),
     )
 

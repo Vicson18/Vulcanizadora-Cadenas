@@ -7,7 +7,7 @@ con el formulario para agregar piezas con los datos de la llanta.
 
 import customtkinter as ctk
 
-from config import C, F
+from config import C, F, CATEGORIAS_PIEZA
 from database import ErrorBaseDatos
 from widgets import (
     Aviso, Campo, CampoSelect, Metrica, Tarjeta, TituloSeccion,
@@ -23,6 +23,7 @@ class InventarioView(ctk.CTkFrame):
         self.app = app
 
         self.tipo_activo = "USADA"
+        self.categoria_activa = None
         self.piezas = []
 
         self._construir()
@@ -84,11 +85,29 @@ class InventarioView(ctk.CTkFrame):
             selected_hover_color=C["altavis_hover"],
             unselected_color=C["hule_alto"],
             unselected_hover_color=C["linea"],
-            text_color=C["asfalto"],
+            text_color=C["gis"],
             corner_radius=6,
         )
         self.selector.set("USADAS")
         self.selector.pack(side="left")
+
+        # Autos / Motos (para separar llantas de moto en el inventario)
+        self.selector_categoria = ctk.CTkSegmentedButton(
+            barra,
+            values=["TODAS", "AUTO", "MOTO"],
+            command=self._cambiar_categoria,
+            font=(F["titulo"][0], 14),
+            height=40,
+            fg_color=C["hule_alto"],
+            selected_color=C["altavis"],
+            selected_hover_color=C["altavis_hover"],
+            unselected_color=C["hule_alto"],
+            unselected_hover_color=C["linea"],
+            text_color=C["gis"],
+            corner_radius=6,
+        )
+        self.selector_categoria.set("TODAS")
+        self.selector_categoria.pack(side="left", padx=(10, 0))
 
         self.campo_busqueda = ctk.CTkEntry(
             barra, width=260, height=40, placeholder_text="Buscar medida, marca o código",
@@ -107,11 +126,11 @@ class InventarioView(ctk.CTkFrame):
 
         cont, self.tabla = crear_tabla(
             panel,
-            [("Codigo", "Código"), ("Tipo", "Tipo"), ("Medida", "Medida"),
-             ("Marca", "Marca"), ("Modelo", "Modelo"), ("Condicion", "Condición"),
-             ("DOT", "DOT"), ("Cantidad", "Existencia"), ("StockMinimo", "Mín"),
-             ("PrecioVenta", "Precio"), ("Ubicacion", "Ubicación")],
-            anchos=[95, 70, 105, 115, 115, 100, 65, 90, 55, 95, 95],
+            [("Codigo", "Código"), ("Tipo", "Tipo"), ("Categoria", "Vehículo"),
+             ("Medida", "Medida"), ("Marca", "Marca"), ("Modelo", "Modelo"),
+             ("Condicion", "Condición"), ("DOT", "DOT"), ("Cantidad", "Existencia"),
+             ("StockMinimo", "Mín"), ("PrecioVenta", "Precio"), ("Ubicacion", "Ubicación")],
+            anchos=[95, 70, 75, 105, 115, 115, 100, 65, 90, 55, 95, 95],
             altura=14,
         )
         cont.pack(fill="both", expand=True, padx=14, pady=(0, 8))
@@ -128,10 +147,16 @@ class InventarioView(ctk.CTkFrame):
         self.tipo_activo = {"USADAS": "USADA", "NUEVAS": "NUEVA", "TODAS": None}[valor]
         self.recargar()
 
+    def _cambiar_categoria(self, valor):
+        self.categoria_activa = None if valor == "TODAS" else valor
+        self.recargar()
+
     def recargar(self):
         filtro = self.campo_busqueda.get().strip()
         try:
-            self.piezas = repositorio.listar_piezas(self.tipo_activo, filtro)
+            self.piezas = repositorio.listar_piezas(
+                self.tipo_activo, filtro, categoria=self.categoria_activa
+            )
             resumen = repositorio.resumen_inventario()
         except ErrorBaseDatos as ex:
             self.aviso.mostrar(str(ex), "error")
@@ -144,8 +169,8 @@ class InventarioView(ctk.CTkFrame):
 
         llenar_tabla(
             self.tabla, self.piezas,
-            ["Codigo", "Tipo", "Medida", "Marca", "Modelo", "Condicion", "DOT",
-             "Cantidad", "StockMinimo", "PrecioVenta", "Ubicacion"],
+            ["Codigo", "Tipo", "Categoria", "Medida", "Marca", "Modelo", "Condicion",
+             "DOT", "Cantidad", "StockMinimo", "PrecioVenta", "Ubicacion"],
             formateadores={"PrecioVenta": lambda v: f"${float(v or 0):,.2f}"},
             tag_extra=lambda f: "alerta" if f.get("BajoStock") else None,
         )
@@ -167,7 +192,9 @@ class InventarioView(ctk.CTkFrame):
     # --------------------------------------------------------------
     def agregar_pieza(self):
         tipo = self.tipo_activo or "USADA"
-        DialogoPieza(self, self.app, tipo_inicial=tipo, al_guardar=self._despues_de_guardar)
+        categoria = self.categoria_activa or "AUTO"
+        DialogoPieza(self, self.app, tipo_inicial=tipo, categoria_inicial=categoria,
+                    al_guardar=self._despues_de_guardar)
 
     def editar_pieza(self):
         pieza = self._pieza_seleccionada()
@@ -202,7 +229,8 @@ class InventarioView(ctk.CTkFrame):
 class DialogoPieza(ctk.CTkToplevel):
     """Formulario con los datos de la llanta: medida, marca, condición, etc."""
 
-    def __init__(self, master, app, pieza=None, tipo_inicial="USADA", al_guardar=None):
+    def __init__(self, master, app, pieza=None, tipo_inicial="USADA",
+                 categoria_inicial="AUTO", al_guardar=None):
         super().__init__(master)
         self.app = app
         self.pieza = pieza
@@ -215,7 +243,7 @@ class DialogoPieza(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
 
-        self._construir(tipo_inicial)
+        self._construir(tipo_inicial, categoria_inicial)
         self._cargar_medidas()
 
         if pieza:
@@ -224,7 +252,7 @@ class DialogoPieza(ctk.CTkToplevel):
         self.after(120, self._centrar)
 
     # --------------------------------------------------------------
-    def _construir(self, tipo_inicial):
+    def _construir(self, tipo_inicial, categoria_inicial="AUTO"):
         cuerpo = ctk.CTkFrame(self, fg_color="transparent")
         cuerpo.pack(padx=26, pady=24)
 
@@ -240,44 +268,48 @@ class DialogoPieza(ctk.CTkToplevel):
         self.select_tipo.grid(row=0, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
         self.select_tipo.set(tipo_inicial)
 
-        self.select_medida = CampoSelect(rejilla, "Medida", [""], ancho=200)
-        self.select_medida.grid(row=0, column=1, sticky="w", pady=(0, 14))
+        self.select_categoria = CampoSelect(rejilla, "Vehículo", CATEGORIAS_PIEZA, ancho=200)
+        self.select_categoria.grid(row=0, column=1, sticky="w", pady=(0, 14))
+        self.select_categoria.set(categoria_inicial)
 
         # Fila 2
-        self.campo_marca = Campo(rejilla, "Marca", "Michelin, Firestone…", ancho=200)
-        self.campo_marca.grid(row=1, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
+        self.select_medida = CampoSelect(rejilla, "Medida", [""], ancho=200)
+        self.select_medida.grid(row=1, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
 
-        self.campo_modelo = Campo(rejilla, "Modelo", "Energy XM2", ancho=200)
-        self.campo_modelo.grid(row=1, column=1, sticky="w", pady=(0, 14))
+        self.campo_marca = Campo(rejilla, "Marca", "Michelin, Firestone…", ancho=200)
+        self.campo_marca.grid(row=1, column=1, sticky="w", pady=(0, 14))
 
         # Fila 3
-        self.campo_condicion = Campo(rejilla, "Condición", "80% vida", ancho=200)
-        self.campo_condicion.grid(row=2, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
+        self.campo_modelo = Campo(rejilla, "Modelo", "Energy XM2", ancho=200)
+        self.campo_modelo.grid(row=2, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
 
-        self.campo_dot = Campo(rejilla, "DOT", "Semana y año, ej. 2425", ancho=200)
-        self.campo_dot.grid(row=2, column=1, sticky="w", pady=(0, 14))
+        self.campo_condicion = Campo(rejilla, "Condición", "80% vida", ancho=200)
+        self.campo_condicion.grid(row=2, column=1, sticky="w", pady=(0, 14))
 
         # Fila 4
+        self.campo_dot = Campo(rejilla, "DOT", "Semana y año, ej. 2425", ancho=200)
+        self.campo_dot.grid(row=3, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
+
         self.campo_cantidad = Campo(rejilla, "Existencia", "0", ancho=200)
-        self.campo_cantidad.grid(row=3, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
+        self.campo_cantidad.grid(row=3, column=1, sticky="w", pady=(0, 14))
         self.campo_cantidad.set("1")
 
+        # Fila 5
         self.campo_minimo = Campo(rejilla, "Mínimo antes de pedir", "0", ancho=200)
-        self.campo_minimo.grid(row=3, column=1, sticky="w", pady=(0, 14))
+        self.campo_minimo.grid(row=4, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
         self.campo_minimo.set("2")
 
-        # Fila 5
         self.campo_costo = Campo(rejilla, "Precio de costo", "0.00", ancho=200)
-        self.campo_costo.grid(row=4, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
+        self.campo_costo.grid(row=4, column=1, sticky="w", pady=(0, 14))
         self.campo_costo.set("0")
 
+        # Fila 6
         self.campo_venta = Campo(rejilla, "Precio de venta", "0.00", ancho=200)
-        self.campo_venta.grid(row=4, column=1, sticky="w", pady=(0, 14))
+        self.campo_venta.grid(row=5, column=0, sticky="w", padx=(0, 16), pady=(0, 14))
         self.campo_venta.set("0")
 
-        # Fila 6
         self.campo_ubicacion = Campo(rejilla, "Ubicación en el rack", "A-01", ancho=200)
-        self.campo_ubicacion.grid(row=5, column=0, sticky="w", padx=(0, 16), pady=(0, 6))
+        self.campo_ubicacion.grid(row=5, column=1, sticky="w", pady=(0, 14))
 
         self.mensaje = ctk.CTkLabel(cuerpo, text="", font=F["chico"],
                                     text_color=C["rojo"], wraplength=420)
@@ -306,6 +338,7 @@ class DialogoPieza(ctk.CTkToplevel):
 
     def _precargar(self, pieza):
         self.select_tipo.set(pieza["Tipo"])
+        self.select_categoria.set(pieza.get("Categoria") or "AUTO")
         self.select_medida.set(pieza["Medida"])
         self.campo_marca.set(pieza.get("Marca") or "")
         self.campo_modelo.set(pieza.get("Modelo") or "")
@@ -359,6 +392,7 @@ class DialogoPieza(ctk.CTkToplevel):
 
         datos = {
             "tipo": self.select_tipo.get(),
+            "categoria": self.select_categoria.get(),
             "medida_id": medida_id,
             "marca": self.campo_marca.get() or None,
             "modelo": self.campo_modelo.get() or None,

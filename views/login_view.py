@@ -4,12 +4,20 @@ views/login_view.py
 Pantalla 1 del boceto: Username, Password, Access.
 """
 
+import os
+
 import customtkinter as ctk
 
-from config import C, F, APP_NOMBRE, APP_SUBTITULO, APP_VERSION
+from config import C, F, APP_NOMBRE, APP_SUBTITULO, APP_VERSION, RUTA_LOGO
 from database import ErrorBaseDatos
 from widgets import Campo, Huella, Tarjeta, boton_principal
 import repositorio
+
+try:
+    from PIL import Image, ImageEnhance
+    PIL_DISPONIBLE = True
+except ImportError:
+    PIL_DISPONIBLE = False
 
 
 class LoginView(ctk.CTkFrame):
@@ -17,10 +25,63 @@ class LoginView(ctk.CTkFrame):
     def __init__(self, master, app):
         super().__init__(master, fg_color=C["asfalto"])
         self.app = app
+
+        self._logo_original = self._cargar_logo()
+        self._lbl_fondo = None
+        self._imagen_fondo = None    # referencia viva: evita que el GC la borre
+        self._ultimo_tamano = None
+        self._tarea_resize = None
+
         self._construir()
 
     # --------------------------------------------------------------
+    def _cargar_logo(self):
+        if not PIL_DISPONIBLE or not os.path.isfile(RUTA_LOGO):
+            return None
+        try:
+            return Image.open(RUTA_LOGO).convert("RGB")
+        except OSError:
+            return None
+
+    def _fondo_para_tamano(self, ancho, alto):
+        """Recorta y atenúa el logo para que cubra exactamente ancho x alto,
+        como un fondo a pantalla completa (equivalente a 'background-size: cover')."""
+        img = self._logo_original
+        escala = max(ancho / img.width, alto / img.height)
+        w2 = max(1, round(img.width * escala))
+        h2 = max(1, round(img.height * escala))
+        agrandada = img.resize((w2, h2), Image.LANCZOS)
+
+        x0 = (w2 - ancho) // 2
+        y0 = (h2 - alto) // 2
+        recorte = agrandada.crop((x0, y0, x0 + ancho, y0 + alto))
+        atenuada = ImageEnhance.Brightness(recorte).enhance(0.32)
+        return ctk.CTkImage(light_image=atenuada, dark_image=atenuada, size=(ancho, alto))
+
+    def _al_redimensionar(self, evento):
+        ancho, alto = evento.width, evento.height
+        if ancho < 20 or alto < 20 or (ancho, alto) == self._ultimo_tamano:
+            return
+        self._ultimo_tamano = (ancho, alto)
+
+        if self._tarea_resize:
+            self.after_cancel(self._tarea_resize)
+        self._tarea_resize = self.after(80, lambda: self._actualizar_fondo(ancho, alto))
+
+    def _actualizar_fondo(self, ancho, alto):
+        self._tarea_resize = None
+        self._imagen_fondo = self._fondo_para_tamano(ancho, alto)
+        self._lbl_fondo.configure(image=self._imagen_fondo)
+
+    # --------------------------------------------------------------
     def _construir(self):
+        if self._logo_original:
+            # Fondo a pantalla completa, siempre detrás (se crea primero):
+            # el login se coloca encima al agregarse después.
+            self._lbl_fondo = ctk.CTkLabel(self, text="")
+            self._lbl_fondo.place(relx=0, rely=0, relwidth=1, relheight=1)
+            self.bind("<Configure>", self._al_redimensionar)
+
         centro = ctk.CTkFrame(self, fg_color="transparent")
         centro.place(relx=0.5, rely=0.5, anchor="center")
 

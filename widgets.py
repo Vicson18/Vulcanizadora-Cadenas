@@ -227,7 +227,7 @@ def boton_principal(master, texto, comando, ancho=200, alto=44, **kw):
     return ctk.CTkButton(
         master, text=texto.upper(), command=comando, width=ancho, height=alto,
         font=(F["titulo"][0], 15), fg_color=C["altavis"],
-        hover_color=C["altavis_hover"], text_color=C["asfalto"],
+        hover_color=C["altavis_hover"], text_color=C["gis"],
         corner_radius=6, **kw
     )
 

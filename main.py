@@ -80,7 +80,7 @@ class Aplicacion(ctk.CTk):
     # Estructura
     # ==============================================================
     def _barra_superior(self):
-        self.barra = ctk.CTkFrame(self, fg_color=C["hule"], corner_radius=0, height=64)
+        self.barra = ctk.CTkFrame(self, fg_color=C["barra"], corner_radius=0, height=64)
         self.barra.pack_propagate(False)
 
         interior = ctk.CTkFrame(self.barra, fg_color="transparent")
@@ -92,7 +92,7 @@ class Aplicacion(ctk.CTk):
 
         ctk.CTkLabel(marca, text=APP_NOMBRE.upper(), font=(F["titulo"][0], 20),
                      text_color=C["gis"]).pack(anchor="w")
-        Huella(marca, ancho=120, alto=6).pack(anchor="w", pady=(1, 0))
+        Huella(marca, ancho=120, alto=6, fondo=C["barra"]).pack(anchor="w", pady=(1, 0))
 
         # --- Navegación ----------------------------------------------
         navegacion = ctk.CTkFrame(interior, fg_color="transparent")
@@ -103,10 +103,10 @@ class Aplicacion(ctk.CTk):
                              ("ordenes", "Crear orden"),
                              ("inventario", "Inventario")):
             boton = ctk.CTkButton(
-                navegacion, text=texto.upper(), width=130, height=38,
-                font=(F["titulo"][0], 14), corner_radius=6,
+                navegacion, text=texto.upper(), width=160, height=40,
+                font=(F["titulo"][0], 18), corner_radius=6,
                 fg_color="transparent", hover_color=C["hule_alto"],
-                text_color=C["gis_tenue"],
+                text_color=C["gis"],
                 command=lambda c=clave: self.mostrar(c),
             )
             boton.pack(side="left", padx=(0, 6))
@@ -117,7 +117,7 @@ class Aplicacion(ctk.CTk):
         sesion.pack(side="right")
 
         self.lbl_usuario = ctk.CTkLabel(sesion, text="", font=F["chico"],
-                                        text_color=C["gis_tenue"])
+                                        text_color=C["gis"])
         self.lbl_usuario.pack(side="left", padx=(0, 14))
 
         ctk.CTkButton(
@@ -164,7 +164,7 @@ class Aplicacion(ctk.CTk):
             activo = clave == nombre
             boton.configure(
                 fg_color=C["hule_alto"] if activo else "transparent",
-                text_color=C["altavis"] if activo else C["gis_tenue"],
+                text_color=C["altavis"] if activo else C["gis"],
             )
 
         if hasattr(vista, "al_mostrar"):

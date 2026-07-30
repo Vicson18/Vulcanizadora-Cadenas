@@ -10,7 +10,7 @@ from datetime import date
 
 import customtkinter as ctk
 
-from config import C, F
+from config import C, F, SERVICIOS_RAPIDOS
 from database import ErrorBaseDatos
 from impresion import MENSAJE_SIN_REPORTLAB, REPORTLAB_DISPONIBLE, imprimir_orden
 from widgets import (
@@ -153,7 +153,42 @@ class OrdenesView(ctk.CTkFrame):
 
         self.campo_concepto = Campo(cuerpo, "Concepto",
                                     "Ej. Reparación de ponchadura, balanceo, montaje")
-        self.campo_concepto.pack(fill="x", pady=(12, 14))
+        self.campo_concepto.pack(fill="x", pady=(12, 8))
+
+        ctk.CTkLabel(
+            cuerpo, text="SERVICIOS RÁPIDOS", font=F["etiqueta"],
+            text_color=C["gis_tenue"], anchor="w",
+        ).pack(anchor="w", pady=(0, 2))
+        ctk.CTkLabel(
+            cuerpo, text="Captura el costo de cada servicio y agrégalo con la medida "
+                         "elegida arriba.",
+            font=F["chico"], text_color=C["gis_tenue"], anchor="w", wraplength=340,
+        ).pack(anchor="w", pady=(0, 8))
+
+        self.precios_servicios = {}
+        for servicio in SERVICIOS_RAPIDOS:
+            fila_srv = ctk.CTkFrame(cuerpo, fg_color="transparent")
+            fila_srv.pack(fill="x", pady=(0, 6))
+
+            ctk.CTkLabel(
+                fila_srv, text=servicio, font=F["chico"], text_color=C["gis"],
+                anchor="w", width=180,
+            ).pack(side="left")
+
+            campo_precio_servicio = ctk.CTkEntry(
+                fila_srv, width=90, height=34, placeholder_text="0.00",
+                font=F["cuerpo"], fg_color=C["hule_alto"], border_color=C["linea"],
+                border_width=1, text_color=C["gis"], corner_radius=6,
+            )
+            campo_precio_servicio.pack(side="left", padx=(8, 8))
+            self.precios_servicios[servicio] = campo_precio_servicio
+
+            ctk.CTkButton(
+                fila_srv, text="Agregar", width=90, height=34,
+                command=lambda s=servicio, c=campo_precio_servicio: self._agregar_servicio_rapido(s, c),
+                font=F["chico"], fg_color=C["hule_alto"], hover_color=C["linea"],
+                text_color=C["altavis"], corner_radius=6,
+            ).pack(side="left")
 
         boton_principal(cuerpo, "Agregar a la orden", self.agregar_renglon,
                         ancho=260).pack(anchor="w")
@@ -359,6 +394,41 @@ class OrdenesView(ctk.CTkFrame):
             return self.piezas_medida[indice]
         return None
 
+    def _agregar_servicio_rapido(self, servicio: str, campo_precio):
+        """Agrega un servicio rápido directo a la orden, con el costo que
+        el operador capturó a un lado y la medida elegida arriba."""
+        medida = self.select_medida.get()
+        medida_id = self._medida_id(medida)
+
+        if not medida_id:
+            self.aviso.mostrar("Elige la medida de llanta antes de agregar el servicio.", "error")
+            return
+
+        try:
+            precio = float(campo_precio.get().strip() or 0)
+        except ValueError:
+            self.aviso.mostrar(f"Costo inválido para {servicio}.", "error")
+            return
+
+        if precio <= 0:
+            self.aviso.mostrar(f"Captura el costo de {servicio}.", "error")
+            return
+
+        cantidad = self.contador.get()
+
+        self.renglones.append({
+            "medida_id": medida_id,
+            "medida": medida,
+            "cantidad": cantidad,
+            "pieza_id": None,
+            "precio": precio,
+            "descripcion": servicio,
+        })
+
+        self._refrescar_renglones()
+        campo_precio.delete(0, "end")
+        self.aviso.mostrar(f"{cantidad} × {servicio} agregado.", "ok", segundos=3)
+
     def _nueva_medida(self):
         dialogo = ctk.CTkInputDialog(
             title="Nueva medida",
@@ -528,6 +598,9 @@ class OrdenesView(ctk.CTkFrame):
         for campo in (self.campo_cliente, self.campo_telefono, self.campo_automovil,
                       self.campo_placas, self.campo_precio, self.campo_concepto):
             campo.limpiar()
+
+        for campo_precio_servicio in self.precios_servicios.values():
+            campo_precio_servicio.delete(0, "end")
 
         self.texto_notas.delete("1.0", "end")
         self.renglones.clear()

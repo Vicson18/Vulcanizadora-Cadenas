@@ -5,6 +5,8 @@ Configuración central de la aplicación: conexión a base de datos,
 paleta de colores y tipografías.
 """
 
+import os
+
 # ------------------------------------------------------------------
 # BASE DE DATOS
 # ------------------------------------------------------------------
@@ -32,7 +34,7 @@ APP_VERSION = "1.1.0"
 # Cámbialos por los reales antes de usar la aplicación.
 # ------------------------------------------------------------------
 TALLER = {
-    "nombre": "VULCANIZADORA CADENAS",
+    "nombre": "VULCANIZADORA CADENA",
     "direccion": "Av. Principal 123, Col. Centro, Apodaca, N.L.",
     "telefono": "81 0000 0000",
     "horario": "Lunes a sábado de 8:00 a 19:00",
@@ -44,28 +46,33 @@ TALLER = {
 # Carpeta donde se guardan las órdenes en PDF (se crea sola)
 CARPETA_ORDENES = "ordenes_impresas"
 
+# Logo del taller: fondo de la pantalla de acceso
+RUTA_LOGO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images", "logo.jpeg")
+
 # ------------------------------------------------------------------
-# PALETA  ·  "Asfalto & Cal"
-# Asfalto mojado de fondo, gis de taller para el texto,
-# amarillo de alta visibilidad (el del chaleco) como único acento fuerte.
+# PALETA  ·  "Rojo Metálico & Negro"
+# Negro de taller de fondo, gis de taller para el texto,
+# rojo metálico como único acento fuerte.
 # ------------------------------------------------------------------
 C = {
-    "asfalto":      "#0E1113",   # fondo de ventana
-    "hule":         "#171B1F",   # tarjetas y paneles
-    "hule_alto":    "#20262B",   # campos, filas alternas
-    "linea":        "#2C343B",   # bordes y separadores
-    "gis":          "#E8EDF2",   # texto principal
-    "gis_tenue":    "#8A959E",   # texto secundario
-    "altavis":      "#FFC145",   # acento: amarillo alta visibilidad
-    "altavis_hover":"#E5A92B",
-    "parche":       "#E85D3D",   # naranja de parche caliente (alertas suaves)
+    "asfalto":      "#0F0E0E",   # fondo de ventana
+    "hule":         "#1C1919",   # tarjetas y paneles
+    "hule_alto":    "#282323",   # campos, filas alternas
+    "linea":        "#403838",   # bordes y separadores
+    "gis":          "#F2EDEC",   # texto principal
+    "gis_tenue":    "#A69B99",   # texto secundario
+    "altavis":      "#FF1436",   # acento: rojo metálico brillante
+    "altavis_hover":"#D40E2B",
+    "barra":        "#FF3355",   # tira superior: rojo claro brillante
+    "parche":       "#E8862D",   # naranja de aviso (alertas suaves)
     "verde":        "#3DD68C",   # OK / terminado
-    "rojo":         "#FF5A5F",   # error / cancelado
-    "azul":         "#4CB2E5",   # informativo
+    "rojo":         "#FF4B5C",   # error / cancelado
+    "azul":         "#4C9FE5",   # informativo
 }
 
 # Colores para los segmentos de las gráficas de dona
-SERIE_COLORES = ["#FFC145", "#E85D3D", "#4CB2E5", "#3DD68C", "#B08CFF", "#8A959E"]
+# (se mantienen medios/claros a propósito: el número se dibuja encima en tono oscuro)
+SERIE_COLORES = ["#FF1436", "#E8862D", "#4C9FE5", "#3DD68C", "#B0A8A6", "#D4AF37"]
 
 # ------------------------------------------------------------------
 # TIPOGRAFÍAS
@@ -92,4 +99,14 @@ F = {
 # REGLAS DE NEGOCIO
 # ------------------------------------------------------------------
 TIPOS_PIEZA = ["USADA", "NUEVA"]
+CATEGORIAS_PIEZA = ["AUTO", "MOTO"]
 ESTATUS_ORDEN = ["ABIERTA", "EN PROCESO", "TERMINADA", "CANCELADA"]
+
+# Servicios de un clic para el formulario de "Crear orden": al presionarlos
+# solo rellenan el campo Concepto, el operador sigue eligiendo medida y precio.
+SERVICIOS_RAPIDOS = [
+    "Balanceo de rines",
+    "Inflado",
+    "Revisión de presión",
+    "Cambio de válvulas",
+]
